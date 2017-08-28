@@ -31,9 +31,10 @@ class Sender:
     pack_fmt = struct.Struct("@q")
     header = ZBX_TCP_HEADER_DATA + ZBX_TCP_HEADER_VERSION
 
-    def __init__(self, hostname, port):
+    def __init__(self, hostname, port, timeout: int=30):
         self.hostname = hostname
         self.port = port
+        self.timeout = timeout
 
     @classmethod
     def encode_msg(cls, msg: str):
@@ -49,6 +50,9 @@ class Sender:
         :param data: [{"host": "host", "key": "key", "value": "olo", "clock": ts, "ns": 0}]
         :return: {'info': 'processed: 1; failed: 0; total: 1; seconds spent: 0.000075', 'response': 'success'}
         """
+        return await asyncio.wait_for(self._send(data), timeout=self.timeout)
+
+    async def _send(self, data: list) -> dict:
         reader, writer = await asyncio.open_connection(self.hostname, self.port)
         req = {"request": ZBX_PROTO_VALUE_SENDER_DATA,
                "data": data,

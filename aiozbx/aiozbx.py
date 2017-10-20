@@ -28,7 +28,7 @@ class ZBXEmptyRead(ZBXException):
 
 
 class Sender:
-    pack_fmt = struct.Struct("@q")
+    pack_fmt = struct.Struct("<q")
     header = ZBX_TCP_HEADER_DATA + ZBX_TCP_HEADER_VERSION
 
     def __init__(self, hostname, port, timeout: int=30):

@@ -37,11 +37,11 @@ class Sender:
         self.timeout = timeout
 
     @classmethod
-    def encode_msg(cls, msg: str):
+    def encode_msg(cls, msg: bytes):
         res = bytearray()
         res += cls.header
         res += cls.pack_fmt.pack(len(msg))
-        res += msg.encode()
+        res += msg
         return bytes(res)
 
     async def send(self, data: list) -> dict:
@@ -58,7 +58,7 @@ class Sender:
                "data": data,
                "clock": int(time.time()),
                "ns": 0}
-        req = json.dumps(req)
+        req = json.dumps(req, ensure_ascii=False).encode()
         msg = self.encode_msg(req)
         _logger.debug("write %s", msg)
         writer.write(msg)

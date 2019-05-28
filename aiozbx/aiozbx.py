@@ -1,18 +1,10 @@
 import asyncio
-import json
 import logging
-import struct
 import time
 
+from .data_protocol import SenderData, ZBXException
+
 _logger = logging.getLogger(__name__)
-
-ZBX_PROTO_VALUE_SENDER_DATA = "sender data"
-ZBX_TCP_HEADER_DATA = b"ZBXD"
-ZBX_TCP_HEADER_VERSION = b"\1"
-
-
-class ZBXException(Exception):
-    pass
 
 
 class ZBXTrapperException(Exception):
@@ -28,21 +20,10 @@ class ZBXEmptyRead(ZBXException):
 
 
 class Sender:
-    pack_fmt = struct.Struct("<q")
-    header = ZBX_TCP_HEADER_DATA + ZBX_TCP_HEADER_VERSION
-
     def __init__(self, hostname, port, timeout: int=30):
         self.hostname = hostname
         self.port = port
         self.timeout = timeout
-
-    @classmethod
-    def encode_msg(cls, msg: bytes):
-        res = bytearray()
-        res += cls.header
-        res += cls.pack_fmt.pack(len(msg))
-        res += msg
-        return bytes(res)
 
     async def send(self, data: list) -> dict:
         """
@@ -54,28 +35,20 @@ class Sender:
 
     async def _send(self, data: list) -> dict:
         reader, writer = await asyncio.open_connection(self.hostname, self.port)
-        req = {"request": ZBX_PROTO_VALUE_SENDER_DATA,
-               "data": data,
-               "clock": int(time.time()),
-               "ns": 0}
-        req = json.dumps(req, ensure_ascii=False).encode()
-        msg = self.encode_msg(req)
+        msg = SenderData.encode_msg(data)
         _logger.debug("write %s", msg)
         writer.write(msg)
         try:
             header = await reader.readexactly(5)
-            if header != self.header:
+            if header != SenderData.header:
                 raise ZBXException("received wrong header %s" % header)
         except asyncio.streams.IncompleteReadError:
             raise ZBXEmptyRead()
         data_size = await reader.readexactly(8)
-        data_size = self.pack_fmt.unpack(data_size)[0]
+        data_size = SenderData.pack_fmt.unpack(data_size)[0]
         data = await reader.readexactly(data_size)
-        if data == b"ZBX_NOTSUPPORTED":
-            raise ZBXNotSupported()
-        writer.write(msg)
+        data = SenderData.decode_msg(data)
         writer.close()
-        data = json.loads(data.decode())
         return data
 
 

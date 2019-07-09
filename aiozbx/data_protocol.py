@@ -15,15 +15,23 @@ class ZBXNotSupported(ZBXException):
     pass
 
 
+class ZBXMsgTooBig(ZBXException):
+    pass
+
+
 class SenderData:
     pack_fmt = struct.Struct("<q")
     header = ZBX_TCP_HEADER_DATA + ZBX_TCP_HEADER_VERSION
 
     @classmethod
-    def pack_msg(cls, msg):
+    def pack_msg(cls, msg, _max_len=128*1048576):
+        # _max_len from zabbix/include/common.h #define ZBX_MAX_RECV_DATA_SIZE	(128 * ZBX_MEBIBYTE)
         res = bytearray()
         res += cls.header
-        res += cls.pack_fmt.pack(len(msg))
+        msg_len = len(msg)
+        if msg_len > _max_len:
+            raise ZBXMsgTooBig("%s > %s" % (msg_len, _max_len))
+        res += cls.pack_fmt.pack(msg_len)
         res += msg
         return bytes(res)
 
